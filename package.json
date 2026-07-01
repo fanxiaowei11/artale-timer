@@ -1,0 +1,12 @@
+{
+  "name": "artale-timer",
+  "version": "1.0.0",
+  "description": "Artale 炎魔机制计时器 - 多用户实时同步版",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "socket.io": "^4.7.4"
+  }
+}

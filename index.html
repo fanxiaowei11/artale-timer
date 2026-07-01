@@ -1,0 +1,387 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Artale 炎魔机制计时器</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #111827;
+      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --accent: #f97316;
+      --accent-2: #22c55e;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .header,
+    .card {
+      background: rgba(17, 24, 39, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+    }
+
+    .header { padding: 24px; }
+    .card { padding: 20px; }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(28px, 4vw, 40px);
+    }
+
+    .subtitle {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 20px;
+    }
+
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 24px;
+    }
+
+    .card p {
+      margin: 0 0 16px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .timer {
+      font-size: clamp(36px, 7vw, 56px);
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin: 12px 0 6px;
+    }
+
+    .status {
+      font-size: 15px;
+      color: var(--muted);
+      min-height: 24px;
+      margin-bottom: 16px;
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 14px 18px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.1s ease, opacity 0.2s ease;
+    }
+
+    button:hover { opacity: 0.95; }
+    button:active { transform: scale(0.98); }
+    button:disabled { cursor: not-allowed; opacity: 0.65; }
+
+    .primary { background: var(--accent); color: white; }
+    .secondary { background: #1e293b; color: var(--text); border: 1px solid var(--border); }
+    .success { background: var(--accent-2); color: #052e16; }
+
+    .notice {
+      position: sticky;
+      top: 12px;
+      z-index: 10;
+      padding: 16px 18px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      background: rgba(2, 6, 23, 0.95);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+      display: none;
+    }
+
+    .notice.show { display: block; }
+    .notice strong { color: #fbbf24; }
+
+    .hint-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .flash { animation: flashBg 0.8s ease-in-out 4; }
+
+    @keyframes flashBg {
+      0%, 100% { box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25); }
+      50% { box-shadow: 0 0 0 4px rgba(249, 115, 22, 0.45); }
+    }
+
+    .footer {
+      color: var(--muted);
+      text-align: center;
+      font-size: 14px;
+      padding-bottom: 20px;
+    }
+
+    .connection-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #1e293b;
+      border: 1px solid var(--border);
+    }
+
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--danger);
+    }
+
+    .connection-dot.connected { background: var(--accent-2); }
+
+    @media (max-width: 640px) {
+      body { padding: 14px; }
+      .header, .card { padding: 16px; }
+      button { width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="globalNotice" class="notice" aria-live="assertive"></div>
+
+    <section class="header">
+      <h1>Artale 炎魔机制计时器</h1>
+      <p class="subtitle">
+        提供两个计时功能：<br>
+        1. 召唤炎魔后，每 2 分 30 秒提醒一次魔方，共提醒 20 次。<br>
+        2. 看到双魔方后，38 秒提醒躲避黑水，提醒后自动重置，等待下一次启动。
+      </p>
+      <p style="margin-top: 10px;">
+        <span class="connection-status" id="connStatus">
+          <span class="connection-dot" id="connDot"></span>
+          <span id="connLabel">连接中...</span>
+        </span>
+      </p>
+    </section>
+
+    <section class="grid">
+      <article class="card" id="cubeCard">
+        <h2>按钮一：魔方提醒</h2>
+        <p>召唤炎魔后按一次开始。每 2:30 提醒一次，共提醒 20 次。</p>
+        <div class="timer" id="cubeTimer">02:30</div>
+        <div class="status" id="cubeStatus">尚未启动</div>
+        <div class="button-row">
+          <button class="primary" id="cubeStartBtn">开始魔方提醒</button>
+          <button class="secondary" id="cubeResetBtn">重置</button>
+        </div>
+      </article>
+
+      <article class="card" id="waterCard">
+        <h2>按钮二：黑水提醒</h2>
+        <p>双魔方出现后按一次开始。38 秒后提醒躲避黑水，之后自动重置。</p>
+        <div class="timer" id="waterTimer">00:38</div>
+        <div class="status" id="waterStatus">尚未启动</div>
+        <div class="button-row">
+          <button class="success" id="waterStartBtn">开始 38 秒倒数</button>
+          <button class="secondary" id="waterResetBtn">重置</button>
+        </div>
+      </article>
+    </section>
+
+    <section class="card">
+      <h2>使用方式</h2>
+      <ul class="hint-list">
+        <li>炎魔召唤后，<strong>任意用户</strong>按一次"开始魔方提醒"，所有用户同步看到倒计时。</li>
+        <li>每 2 分 30 秒所有用户会弹出提醒并播放提示音，共提醒 20 次。</li>
+        <li>炎魔本体阶段看到双魔方后，<strong>任意用户</strong>按一次"开始 38 秒倒数"。</li>
+        <li>38 秒到所有用户会提醒"躲避黑水"，之后按钮二自动回到待机状态。</li>
+        <li>手机浏览器也可以使用。第一次使用时，建议先点一下按钮，让浏览器允许播放音效。</li>
+      </ul>
+    </section>
+
+    <div class="footer">多人实时同步版 — 所有用户操作共享，通过 Node.js + Socket.IO 实现</div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const CUBE_INTERVAL = 150;
+    const CUBE_ALERT_LIMIT = 20;
+    const WATER_INTERVAL = 38;
+
+    const cubeTimerEl = document.getElementById('cubeTimer');
+    const cubeStatusEl = document.getElementById('cubeStatus');
+    const cubeCardEl = document.getElementById('cubeCard');
+    const cubeStartBtn = document.getElementById('cubeStartBtn');
+    const cubeResetBtn = document.getElementById('cubeResetBtn');
+
+    const waterTimerEl = document.getElementById('waterTimer');
+    const waterStatusEl = document.getElementById('waterStatus');
+    const waterCardEl = document.getElementById('waterCard');
+    const waterStartBtn = document.getElementById('waterStartBtn');
+    const waterResetBtn = document.getElementById('waterResetBtn');
+
+    const globalNotice = document.getElementById('globalNotice');
+    const connDot = document.getElementById('connDot');
+    const connLabel = document.getElementById('connLabel');
+
+    const socket = io();
+
+    socket.on('connect', () => {
+      connDot.classList.add('connected');
+      connLabel.textContent = '已连接（多人同步中）';
+    });
+
+    socket.on('disconnect', () => {
+      connDot.classList.remove('connected');
+      connLabel.textContent = '已断开连接';
+    });
+
+    function formatTime(totalSeconds) {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+
+    function showNotice(message) {
+      globalNotice.innerHTML = message;
+      globalNotice.classList.add('show');
+      setTimeout(() => {
+        globalNotice.classList.remove('show');
+      }, 5000);
+    }
+
+    function flashCard(cardElement) {
+      cardElement.classList.remove('flash');
+      void cardElement.offsetWidth;
+      cardElement.classList.add('flash');
+    }
+
+    function beep(times = 2) {
+      try {
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
+        const start = audioCtx.currentTime;
+
+        for (let i = 0; i < times; i++) {
+          const oscillator = audioCtx.createOscillator();
+          const gainNode = audioCtx.createGain();
+          const startTime = start + i * 0.35;
+
+          oscillator.type = 'sine';
+          oscillator.frequency.setValueAtTime(880, startTime);
+          gainNode.gain.setValueAtTime(0.0001, startTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.18, startTime + 0.02);
+          gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.24);
+          oscillator.connect(gainNode);
+          gainNode.connect(audioCtx.destination);
+          oscillator.start(startTime);
+          oscillator.stop(startTime + 0.25);
+        }
+      } catch (error) {
+        console.error('音效播放失败:', error);
+      }
+    }
+
+    function updateUI(state) {
+      // 魔方计时器
+      if (state.cube.running) {
+        cubeTimerEl.textContent = formatTime(state.cube.remaining);
+        cubeStatusEl.textContent = `第 ${state.cube.alertCount + 1} 次提醒倒数中`;
+        cubeStartBtn.disabled = true;
+        cubeStartBtn.textContent = '自动提醒进行中';
+      } else if (state.cube.alertCount >= CUBE_ALERT_LIMIT) {
+        cubeTimerEl.textContent = '完成';
+        cubeStatusEl.textContent = `已完成 ${CUBE_ALERT_LIMIT} 次提醒`;
+        cubeStartBtn.disabled = true;
+        cubeStartBtn.textContent = '已完成 20 次';
+      } else if (state.cube.alertCount > 0) {
+        cubeTimerEl.textContent = formatTime(state.cube.remaining);
+        cubeStatusEl.textContent = `已提醒 ${state.cube.alertCount} / ${CUBE_ALERT_LIMIT} 次`;
+        cubeStartBtn.disabled = false;
+        cubeStartBtn.textContent = '开始魔方提醒';
+      } else {
+        cubeTimerEl.textContent = formatTime(state.cube.remaining);
+        cubeStatusEl.textContent = '尚未启动';
+        cubeStartBtn.disabled = false;
+        cubeStartBtn.textContent = '开始魔方提醒';
+      }
+
+      // 黑水计时器
+      if (state.water.running) {
+        waterTimerEl.textContent = formatTime(state.water.remaining);
+        waterStatusEl.textContent = '黑水倒数中';
+        waterStartBtn.disabled = true;
+        waterStartBtn.textContent = '倒数进行中';
+      } else {
+        waterTimerEl.textContent = formatTime(state.water.remaining);
+        waterStatusEl.textContent = '尚未启动';
+        waterStartBtn.disabled = false;
+        waterStartBtn.textContent = '开始 38 秒倒数';
+      }
+    }
+
+    socket.on('state', (state) => {
+      updateUI(state);
+    });
+
+    socket.on('event', (data) => {
+      switch (data.type) {
+        case 'cube_started':
+          showNotice(`<strong>魔方提醒已启动：</strong>第 ${data.alertCount + 1} 次提醒倒数中`);
+          break;
+        case 'cube_alert':
+          flashCard(cubeCardEl);
+          beep(3);
+          showNotice(`<strong>魔方提醒：</strong>第 ${data.alertCount} 次魔方时间到了！`);
+          break;
+        case 'cube_completed':
+          beep(1);
+          showNotice('<strong>魔方提醒：</strong>20 次提醒全部完成！');
+          break;
+        case 'water_alert':
+          flashCard(waterCardEl);
+          beep(4);
+          showNotice('<strong>黑水提醒：</strong>38 秒到了，请躲避黑水！');
+          break;
+      }
+    });
+
+    cubeStartBtn.addEventListener('click', () => socket.emit('cube_start'));
+    cubeResetBtn.addEventListener('click', () => socket.emit('cube_reset', true));
+    waterStartBtn.addEventListener('click', () => socket.emit('water_start'));
+    waterResetBtn.addEventListener('click', () => socket.emit('water_reset'));
+  </script>
+</body>
+</html>
